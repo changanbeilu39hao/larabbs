@@ -3,12 +3,13 @@
 namespace App\Handlers;
 
 use Illuminate\Support\Str;
+use Image;
 
 class ImageUploadHandler
 {
     protected $allow_ext = ['jpg', 'png', 'gif', 'jpeg'];
 
-    public function save($file, $folder,$file_prefix)
+    public function save($file, $folder, $file_prefix, $max_width = false)
     {
         //1.构建存储文件夹的规则
         $folder_name = "uploads/images/$folder/" . date("Ym/d", time());
@@ -20,16 +21,35 @@ class ImageUploadHandler
         $filename = $file_prefix . '_' . time() . '_' . Str::random(10) . '.' . $extension;
         
         //2.检验是不是图片
-        if (! in_array($$extension, $this->allow_ext)){
+        if (! in_array($extension, $this->allow_ext)){
             return false;
         }
 
         //3.将上传的文件移动到文件夹中
         $file->move($upload_path, $filename);
 
+        // 裁剪图片宽度
+        if ($max_width && $extension != 'gif') {
+            $this->reduceSize($upload_path . '/' . $filename, $max_width);
+        }
+
         return [
             'path' => config('app.url') . "/$folder_name/$filename"
         ];
     
+    }
+
+    public function reduceSize($file_path, $max_width)
+    {
+        // 先实例化
+        $image = Image::make($file_path);
+
+        $image->resize($max_width, null, function ($constraint) {
+            $constraint->aspectRatio();
+            $constraint->upsize();
+
+        });
+
+        $image->save();
     }
 }
